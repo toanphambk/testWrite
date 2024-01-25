@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as _ from 'lodash';
-import nodes7 from 'nodes7';
+import * as nodes7 from 'nodes7';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import EventEmitter from 'events';
 import { v4 as uuidv4 } from 'uuid';
