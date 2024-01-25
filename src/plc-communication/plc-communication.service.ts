@@ -107,7 +107,7 @@ export class PlcCommunicationService {
         this.addressList.write.push({ name: key, address: setting.address });
       }
     });
-
+    log(this.addressList);
     const readingAdressList = this.addressList.read.map(
       (block) => block.address,
     );
