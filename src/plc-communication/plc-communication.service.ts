@@ -23,6 +23,7 @@ export class PlcCommunicationService {
       barcodeData: 'DB47,S2.40',
     };
     await this.initConnection(dataBlock);
+    this.writeToPLC(['barcodeFlag', 'barcodeData'], [1, 'asdfasdfasdf']);
     this.startScan();
   }
 
