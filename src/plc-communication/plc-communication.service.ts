@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { nodes7 } from 'nodes7';
+import nodes7 from 'nodes7';
 
 import { v4 as uuidv4 } from 'uuid';
 import { queueState } from './Interface/plcData.interface';
