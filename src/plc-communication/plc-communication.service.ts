@@ -170,6 +170,8 @@ export class PlcCommunicationService {
   private dataUpdate = async () => {
     try {
       const dataFromPLC = await this.readFromPlc();
+      console.log(this.data);
+
       Object.keys(dataFromPLC).map((address) => {
         const found = this.addressList.read.find(
           (block) => block.address === address,
