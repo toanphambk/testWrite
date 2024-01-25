@@ -1,4 +1,3 @@
-import yargs from 'yargs';
 import { Configuration } from './configuration.interface';
 
 const configuration: Configuration = {
