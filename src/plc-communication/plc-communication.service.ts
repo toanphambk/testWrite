@@ -8,13 +8,32 @@ import {
   PlcAddresslist,
   PlcData,
   BlockInfo,
+  Configuration,
+  BlockSetting,
 } from './interface/plc-communication.interface';
 import { S7CommunicationSetting } from './interface/plc-communication.interface';
-import { ServiceState } from '../interface/systemState.interface';
-import { BlockSetting } from '../config/configuration.interface';
-import { Payload } from 'src/main-controller/interface/main-controller.interface';
-import configuration from 'src/config/configuration';
+import { ServiceState } from './interface/systemState.interface';
+import { Payload } from 'src/plc-communication/interface/main-controller.interface';
 import { log } from 'console';
+
+const configuration: Configuration = {
+  blockSetting: {
+    barcodeData: {
+      address: 'DB47,S2.40',
+      type: 'WRITE_ONLY',
+    },
+    barcodeFlag: {
+      address: 'DB47,INT0.1',
+      type: 'READ_WRITE',
+    },
+  },
+  plcSetting: {
+    ip: '192.168.0.1',
+    port: 102,
+    rack: 0,
+    slot: 1,
+  },
+};
 
 @Injectable()
 export class PlcCommunicationService {

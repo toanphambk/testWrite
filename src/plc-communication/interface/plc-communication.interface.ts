@@ -1,9 +1,17 @@
+export type Configuration = {
+  blockSetting: BlockSetting;
+  plcSetting: S7CommunicationSetting;
+};
 export interface S7CommunicationSetting {
   ip: string;
   port: number;
   rack: number;
   slot: number;
 }
+
+export type BlockSetting = {
+  [key in BlockName]: BlockInfo;
+};
 
 export interface BlockInfo {
   address: string;
