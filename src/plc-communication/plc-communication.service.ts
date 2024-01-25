@@ -7,9 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   PlcAddresslist,
   PlcData,
-  BlockInfo,
   Configuration,
   BlockSetting,
+  PlcWriteQueue,
+  BlockName,
 } from './interface/plc-communication.interface';
 import { S7CommunicationSetting } from './interface/plc-communication.interface';
 import { ServiceState } from './interface/systemState.interface';
@@ -45,15 +46,15 @@ export class PlcCommunicationService {
   private s7Connection = new nodes7();
   private plcEvent = new EventEmitter();
   private data = <PlcData>{ state: ServiceState.BOOT_UP };
-  private plcWriteQueue = [];
+  private plcWriteQueue: PlcWriteQueue[] = [];
   private addressList: PlcAddresslist;
 
   private async test() {
     await this.initConnection(configuration.plcSetting);
     await this.addDataBlock(configuration.blockSetting);
-    this.triggerCycleScan();
-    this.writeBlock([configuration.blockSetting.barcodeData], ['asdfasdf']);
-    this.writeBlock([configuration.blockSetting.barcodeFlag], [1]);
+    await this.triggerCycleScan();
+    this.writeBlock(['barcodeData'], ['asdfasdf']);
+    this.writeBlock(['barcodeFlag'], [1]);
   }
 
   public async initConnection(
@@ -98,18 +99,18 @@ export class PlcCommunicationService {
 
     this.addressList = { read: [], write: [] };
 
-    _.forOwn(dataBlockSetting, (setting, key) => {
-      if (['READ_ONLY', 'READ_WRITE'].indexOf(setting.type) > -1) {
+    Object.entries(dataBlockSetting).forEach(([key, setting]) => {
+      if (['READ_ONLY', 'READ_WRITE'].includes(setting.type)) {
         this.addressList.read.push({ name: key, address: setting.address });
       }
-      if (['WRITE_ONLY', 'READ_WRITE'].indexOf(setting.type) > -1) {
+      if (['WRITE_ONLY', 'READ_WRITE'].includes(setting.type)) {
         this.addressList.write.push({ name: key, address: setting.address });
       }
     });
 
-    const readingAdressList = _.map(this.addressList.read, (block) => {
-      return block.address;
-    });
+    const readingAdressList = this.addressList.read.map(
+      (block) => block.address,
+    );
 
     this.s7Connection.addItems(readingAdressList);
 
@@ -170,9 +171,8 @@ export class PlcCommunicationService {
     try {
       const dataFromPLC = await this.readFromPlc();
       Object.keys(dataFromPLC).map((address) => {
-        const found = _.find(
-          this.addressList.read,
-          (block) => block.address == address,
+        const found = this.addressList.read.find(
+          (block) => block.address === address,
         );
         if (found) {
           this.data[found.name] = dataFromPLC[address];
@@ -186,16 +186,16 @@ export class PlcCommunicationService {
     }
   };
 
-  public writeBlock = (blockInfo: BlockInfo[], data: any[], log = true) => {
+  public writeBlock = (blockName: BlockName[], data: any[], log = true) => {
     return new Promise<boolean>((res, rej) => {
-      const { _isValid, _blockName } = this.blockInfoIsValid(blockInfo);
-      if (!_isValid) {
+      const { isValid, blockAddress } = this.blockInfoIsValid(blockName);
+      if (!isValid) {
         rej('DATA BLOCK IS NOT VALID');
         return;
       }
       const _uuid = uuidv4();
       this.plcWriteQueue.push({
-        blockName: blockInfo.map((blockInfo) => blockInfo.address),
+        blockName: blockAddress,
         data: data,
         uuid: _uuid,
       });
@@ -205,7 +205,7 @@ export class PlcCommunicationService {
           return;
         }
         if (log)
-          console.log(`[ WRITE TO PLC DONE] : [ ${_blockName} ] =[ ${data} ]`);
+          console.log(`[ WRITE TO PLC DONE] : [ ${blockAdress} ] =[ ${data} ]`);
         res(true);
         return;
       });
@@ -284,26 +284,23 @@ export class PlcCommunicationService {
   };
 
   private blockInfoIsValid = (
-    blockInfo: BlockInfo[],
-  ): { _isValid: boolean; _blockName: string[] } => {
-    let _isValid = true;
-    const _blockName = [];
-    _.forEach(blockInfo, (info) => {
-      if (info.type === 'READ_ONLY') {
-        console.log(`[ ERROR ]: Read Only Block Found ${JSON.stringify(info)}`);
-        _isValid = false;
-        return;
-      }
-      const addressFound = _.find(this.addressList.write, (block) => {
-        return block.address == info.address;
-      });
+    blocksName: BlockName[],
+  ): { isValid: boolean; blockAddress: string[] } => {
+    let isValid = true;
+    const blockAddress: string[] = [];
+    blocksName.forEach((blockName) => {
+      const addressFound = this.addressList.write.find(
+        (writeBlockItem) => writeBlockItem.name === blockName,
+      );
       if (!addressFound) {
-        console.log(`[ ERROR ]: Can not find address ${JSON.stringify(info)}`);
-        _isValid = false;
+        console.log(
+          `[ ERROR ]: Can not find valid address ${JSON.stringify(blockName)}`,
+        );
+        isValid = false;
         return;
       }
-      _blockName.push(addressFound.name);
+      blockAddress.push(addressFound.address);
     });
-    return { _isValid, _blockName };
+    return { isValid, blockAddress };
   };
 }
