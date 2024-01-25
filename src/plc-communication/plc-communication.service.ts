@@ -160,10 +160,9 @@ export class PlcCommunicationService {
         });
       }
       await this.dataUpdate();
+      this.triggerCycleScan();
     } catch (error) {
       this.errorHandler('CYCLE SCAN ERROR', false);
-    } finally {
-      await this.triggerCycleScan();
     }
   };
 
