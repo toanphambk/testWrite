@@ -53,7 +53,7 @@ export class PlcCommunicationService {
     await this.initConnection(configuration.plcSetting);
     await this.addDataBlock(configuration.blockSetting);
     await this.triggerCycleScan();
-    this.writeBlock(['barcodeData'], ['asdfasdf']);
+    this.writeBlock(['barcodeData'], ['123123123']);
     this.writeBlock(['barcodeFlag'], [1]);
   }
 
@@ -193,13 +193,13 @@ export class PlcCommunicationService {
         rej('DATA BLOCK IS NOT VALID');
         return;
       }
-      const _uuid = uuidv4();
+      const uuid = uuidv4();
       this.plcWriteQueue.push({
         blockName: blockAddress,
         data: data,
-        uuid: _uuid,
+        uuid,
       });
-      this.plcEvent.once(_uuid, (err) => {
+      this.plcEvent.once(uuid, (err) => {
         if (err) {
           rej(err);
           return;
@@ -290,7 +290,7 @@ export class PlcCommunicationService {
     const blockAddress: string[] = [];
     blocksName.forEach((blockName) => {
       const addressFound = this.addressList.write.find(
-        (writeBlockItem) => writeBlockItem.name === blockName,
+        (writeBlock) => writeBlock.name === blockName,
       );
       if (!addressFound) {
         console.log(
