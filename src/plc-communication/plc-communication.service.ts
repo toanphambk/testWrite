@@ -16,7 +16,7 @@ export class PlcCommunicationService {
     this.startScan();
   }
   public plcEvent = new events.EventEmitter();
-  public configBlock = {}1
+  public configBlock = {};
 
   private conn = new nodes7();
   private queue = {
