@@ -52,7 +52,7 @@ export class PlcCommunicationService {
   private async test() {
     await this.initConnection(configuration.plcSetting);
     await this.addDataBlock(configuration.blockSetting);
-    await this.triggerCycleScan();
+    this.triggerCycleScan();
     this.writeBlock(['barcodeData'], ['123123123']);
     this.writeBlock(['barcodeFlag'], [1]);
   }
