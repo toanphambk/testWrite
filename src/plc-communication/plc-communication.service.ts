@@ -19,7 +19,8 @@ export class PlcCommunicationService {
   };
   private async test() {
     const dataBlock = {
-      barcodeFlag: 'DB1,INT0.1',
+      barcodeFlag: 'DB47,INT0.1',
+      barcodeData: 'DB47,S2.40',
     };
     await this.initConnection(dataBlock);
     this.startScan();
@@ -29,8 +30,8 @@ export class PlcCommunicationService {
     return new Promise<void>((resolve, reject) => {
       this.conn.initiateConnection(
         {
-          port: 102,
           host: '192.168.0.1',
+          port: 102,
           rack: 0,
           slot: 1,
           debug: false,
