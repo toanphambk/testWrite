@@ -8,12 +8,7 @@ import { log } from 'console';
 @Injectable()
 export class PlcCommunicationService {
   constructor() {
-    const dataBlock = {
-      barcodeFlag: 'DB1,INT0.1',
-      barcodeData: 'DB1,S2.40',
-    };
-    this.initConnection(dataBlock);
-    this.startScan();
+    this.test();
   }
   private plcEvent = new EventEmitter();
   public configBlock = {};
@@ -23,6 +18,14 @@ export class PlcCommunicationService {
     status: queueState.INIT,
     buffer: [],
   };
+  private async test() {
+    const dataBlock = {
+      barcodeFlag: 'DB1,INT0.1',
+      barcodeData: 'DB1,S2.40',
+    };
+    await this.initConnection(dataBlock);
+    this.startScan();
+  }
 
   public initConnection = (setting) => {
     return new Promise<void>((resolve, reject) => {
