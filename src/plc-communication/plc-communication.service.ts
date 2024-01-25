@@ -289,18 +289,19 @@ export class PlcCommunicationService {
     let isValid = true;
     const blockAddress: string[] = [];
     blocksName.forEach((blockName) => {
-      const addressFound = this.addressList.write.find(
+      const foundBlock = this.addressList.write.find(
         (writeBlock) => writeBlock.name === blockName,
       );
-      if (!addressFound) {
+      if (!foundBlock) {
         console.log(
           `[ ERROR ]: Can not find valid address ${JSON.stringify(blockName)}`,
         );
         isValid = false;
         return;
       }
-      blockAddress.push(addressFound.address);
+      blockAddress.push(foundBlock.address);
     });
+    console.log({ isValid, blockAddress });
     return { isValid, blockAddress };
   };
 }
