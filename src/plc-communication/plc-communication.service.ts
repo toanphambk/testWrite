@@ -163,7 +163,7 @@ export class PlcCommunicationService {
     } catch (error) {
       this.errorHandler('CYCLE SCAN ERROR', false);
     } finally {
-      void this.triggerCycleScan();
+      await this.triggerCycleScan();
     }
   };
 
