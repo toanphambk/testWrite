@@ -1,197 +1,288 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter } from 'events';
-import * as nodes7 from 'nodes7';
+import { Injectable } from '@nestjs/common';
+import * as _ from 'lodash';
+import nodes7 from 'nodes7';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import EventEmitter from 'events';
 import { v4 as uuidv4 } from 'uuid';
-import { queueState } from './Interface/plcData.interface';
+import {
+  PlcAddresslist,
+  PlcData,
+  BlockInfo,
+} from './interface/plc-communication.interface';
+import { S7CommunicationSetting } from './interface/plc-communication.interface';
+import { ServiceState } from '../interface/systemState.interface';
+import { BlockSetting } from '../config/configuration.interface';
+import { Payload } from 'src/main-controller/interface/main-controller.interface';
+import configuration from 'src/config/configuration';
 import { log } from 'console';
+
 @Injectable()
 export class PlcCommunicationService {
-  constructor() {
+  constructor(private PlcCommunicationServiceEvent: EventEmitter2) {
+    this.data = new Proxy(this.data, this.dataChangeHandler());
     this.test();
   }
-  private plcEvent = new EventEmitter();
-  public configBlock = {};
 
-  private conn = new nodes7();
-  private queue = {
-    status: queueState.INIT,
-    buffer: [],
-  };
+  private s7Connection = new nodes7();
+  private plcEvent = new EventEmitter();
+  private data = <PlcData>{ state: ServiceState.BOOT_UP };
+  private plcWriteQueue = [];
+  private addressList: PlcAddresslist;
+
   private async test() {
-    const dataBlock = {
-      barcodeFlag: 'DB47,INT0.1',
-      barcodeData: 'DB47,S2.40',
-    };
-    await this.initConnection(dataBlock);
-    this.writeToPLC(['barcodeFlag', 'barcodeData'], [1, 'asdfasdfasdf']);
-    this.startScan();
+    await this.initConnection(configuration.plcSetting);
+    this.addDataBlock(configuration.blockSetting);
+    this.triggerCycleScan();
+  }
+  public async initConnection(
+    setting: S7CommunicationSetting,
+  ): Promise<boolean> {
+    console.log(`[ INIT CONNECTION ] : ${JSON.stringify(setting, null, 1)}`);
+    this.data.state = ServiceState.INIT;
+    try {
+      await this.establishConnection(setting);
+      this.triggerCycleScan();
+      return true;
+    } catch (err) {
+      this.errorHandler('INTI CONNECTION ERROR', false, err);
+      return false;
+    }
   }
 
-  public initConnection = (setting) => {
-    return new Promise<void>((resolve, reject) => {
-      this.conn.initiateConnection(
+  private establishConnection(setting: S7CommunicationSetting): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.s7Connection.initiateConnection(
         {
-          host: '192.168.0.1',
-          port: 102,
-          rack: 0,
-          slot: 1,
-          debug: false,
+          port: setting.port,
+          host: setting.ip,
+          rack: setting.rack,
+          slot: setting.slot,
+          debug: true,
         },
-        (err) => {
-          if (typeof err !== 'undefined') {
-            console.log(err);
-            this.errorCallback('Connection Error');
-            reject();
-            return;
-          }
-
-          console.log(setting);
-
-          this.conn.setTranslationCB((tag) => {
-            return setting[tag];
-          });
-
-          this.conn.addItems(
-            Object.keys(setting).map((key) => {
-              return key;
-            }),
-          );
-          this.initScanProcess();
-          Logger.log(`[ CONNECTION INIT DONE ] `);
-          resolve();
-        },
+        (err) => (err ? reject(err) : resolve()),
       );
     });
+  }
+
+  public addDataBlock = async (dataBlockSetting: BlockSetting) => {
+    if (this.data.state == ServiceState.ERROR) {
+      throw new Error('Plc Communication Service Is Not Ready');
+    }
+
+    if (this.data.state == ServiceState.READY) {
+      this.data.state = ServiceState.INIT;
+      this.s7Connection.removeItems();
+    }
+
+    this.addressList = { read: [], write: [] };
+
+    _.forOwn(dataBlockSetting, (setting, key) => {
+      if (['READ_ONLY', 'READ_WRITE'].indexOf(setting.type) > -1) {
+        this.addressList.read.push({ name: key, address: setting.address });
+      }
+      if (['WRITE_ONLY', 'READ_WRITE'].indexOf(setting.type) > -1) {
+        this.addressList.write.push({ name: key, address: setting.address });
+      }
+    });
+    console.log(this.addressList);
+
+    const readingAdressList = _.map(this.addressList.read, (block) => {
+      return block.address;
+    });
+
+    this.s7Connection.addItems(readingAdressList);
+
+    await new Promise<void>((res) => {
+      setTimeout(() => {
+        res();
+      }, 200);
+    });
+    await this.dataUpdate();
+    return true;
   };
 
-  public startScan = async () => {
+  private triggerCycleScan = async () => {
     try {
-      if (this.queue.status != queueState.READY) {
+      if (this.data.state != ServiceState.READY) {
+        console.log('[ PLC Service ]: PLC Service Is Not Ready');
+        this.plcWriteQueue = [];
+        await new Promise<void>((res) => {
+          setTimeout(() => {
+            res();
+          }, 1000);
+        });
         return;
       }
-      if (this.queue.buffer.length == 0) {
-        await this.readFromPlc();
-        return this.startScan();
-      }
-      if (this.queue.buffer.length > 10) {
-        this.errorCallback('queue overflow');
-        return (this.queue.status = queueState.ERROR);
-      }
-      await new Promise<void>((resolve, reject) => {
-        this.conn.writeItems(
-          this.queue.buffer[0].blockName,
-          this.queue.buffer[0].data,
-          async (err) => {
-            if (err) {
-              this.errorCallback('Write to plc error');
-              console.log(err);
-              reject();
-              return;
-            }
-            this.plcEvent.emit(
-              this.queue.buffer[0].uuid,
-              await this.readFromPlc(),
-            );
-            resolve();
-          },
-        );
-      });
-      this.queue.buffer.shift();
-      this.startScan();
-    } catch (error) {
-      this.errorCallback('Cycle Scan Error');
-      setTimeout(() => {
-        this.startScan();
-      }, 1000);
-    }
-  };
 
-  public initScanProcess = async () => {
-    this.queue.buffer = [];
-    this.queue.status = queueState.READY;
-    Logger.log(`[ INIT SCAN ] `);
-    return;
-  };
-
-  public loadConfig = async () => {
-    try {
-      this.queue.status = queueState.INIT;
-      const _plcConfig = [];
-      let _config = {};
-
-      for (let i = 0; i <= 20; i++) {
-        this.configBlock[`vehicleCode${i}`] = `DB14,C${20 * i}.4`;
+      if (this.plcWriteQueue.length > 10) {
+        this.errorHandler('QUEUE OVERFLOW', false, this.plcWriteQueue);
+        return;
       }
 
-      await this.addItem(this.configBlock);
-
-      _config = await this.readFromPlc();
-
-      if (_config == undefined) return;
-
-      for (let i = 0; i <= 20; i++) {
-        _plcConfig.push({
-          vehicleCode: _config[`vehicleCode${i}`].replaceAll('\x00', ''),
+      if (this.plcWriteQueue.length > 0) {
+        await new Promise<void>((res, rej) => {
+          const command = this.plcWriteQueue[0];
+          this.s7Connection.writeItems(
+            command.blockName,
+            command.data,
+            async (err) => {
+              if (err) {
+                rej(this.errorHandler(`WRITE TO PLC ERROR : `, false, command));
+                return;
+              }
+              this.plcWriteQueue.shift();
+              this.plcEvent.emit(command.uuid, undefined);
+              res();
+            },
+          );
         });
       }
-
-      this.queue.status = queueState.READY;
-      this.conn.removeItems();
-      this.queue.buffer = [];
-      return _plcConfig;
+      await this.dataUpdate();
     } catch (error) {
-      this.errorCallback('Load Config Error');
+      this.errorHandler('CYCLE SCAN ERROR', false);
+    } finally {
+      await this.triggerCycleScan();
     }
   };
 
-  public writeToPLC = (blockName: string[], data: any[], log = true) => {
-    return new Promise<void>((resolve) => {
+  private dataUpdate = async () => {
+    try {
+      const dataFromPLC = await this.readFromPlc();
+      Object.keys(dataFromPLC).map((address) => {
+        const found = _.find(
+          this.addressList.read,
+          (block) => block.address == address,
+        );
+        if (found) {
+          this.data[found.name] = dataFromPLC[address];
+          return;
+        }
+        throw new Error('Address not found in read array');
+      });
+      this.data.state = ServiceState.READY;
+    } catch (error) {
+      this.errorHandler('READ FROM PLC ERROR', true, error);
+    }
+  };
+
+  public writeBlock = (blockInfo: BlockInfo[], data: any[], log = true) => {
+    return new Promise<boolean>((res, rej) => {
+      const { _isValid, _blockName } = this.blockInfoIsValid(blockInfo);
+      if (!_isValid) {
+        rej('DATA BLOCK IS NOT VALID');
+        return;
+      }
       const _uuid = uuidv4();
-      this.queue.buffer.push({
-        blockName: blockName,
+      this.plcWriteQueue.push({
+        blockName: blockInfo.map((blockInfo) => blockInfo.address),
         data: data,
         uuid: _uuid,
       });
-      if (log) Logger.log(`[ WRITE TO PLC ]  : [ ${blockName} ] = ${data} `);
-      this.plcEvent.once(_uuid, (data) => {
-        resolve(data);
+      this.plcEvent.once(_uuid, (err) => {
+        if (err) {
+          rej(err);
+          return;
+        }
+        if (log)
+          console.log(`[ WRITE TO PLC DONE] : [ ${_blockName} ] =[ ${data} ]`);
+        res(true);
+        return;
       });
     });
   };
 
   private readFromPlc = () => {
-    return new Promise<any>((resolve, reject) => {
-      this.conn.readAllItems((err, data) => {
+    return new Promise<any>((res, rej) => {
+      this.s7Connection.readAllItems((err, data) => {
         if (err) {
-          this.errorCallback('Read from plc error');
-          reject();
+          rej({ error: err, plcData: data });
           return;
         }
-        this.plcEvent.emit('Plc_Read_Callback', data);
-        log(data);
-        resolve(data);
+        res(data);
       });
     });
   };
 
-  public addItem = (items) => {
-    return new Promise<void>((resolve) => {
-      this.conn.removeItems();
-      this.conn.setTranslationCB((tag) => {
-        return items[tag];
-      });
-      this.conn.addItems(
-        Object.keys(items).map((key) => {
-          return key;
-        }),
-      );
-      setTimeout(() => {
-        resolve();
-      }, 100);
-    });
+  private dataChangeHandler = () => {
+    return {
+      set: (target, key, val) => {
+        const oldVal = target[key];
+        if (oldVal != val) {
+          target[key] = val;
+          const data: Payload = {
+            service: 'plc',
+            data: this.data,
+            key,
+            oldVal,
+            val,
+          };
+          this.PlcCommunicationServiceEvent.emit('dataChange', data);
+          log(data);
+          return true;
+        }
+        return true;
+      },
+      get: (target, key) => {
+        if (typeof target[key] === 'object' && target[key] !== null) {
+          return new Proxy(target[key], this.dataChangeHandler());
+        }
+        return target[key];
+      },
+    };
   };
 
-  private errorCallback = (err) => {
-    this.plcEvent.emit('System_Error', err);
+  private errorHandler = async (
+    err: string,
+    isOperational: boolean,
+    data?: any,
+  ) => {
+    console.log(`[ ERROR ] :  ${err} : ${data ? JSON.stringify(data) : ''}`);
+    if (!isOperational) {
+      this.data.state = ServiceState.ERROR;
+      //do some other logging, event trigger for this
+      return;
+    }
+
+    switch (err) {
+      case 'READ FROM PLC ERROR':
+        this.data.state = ServiceState.ERROR;
+        const isBadReading = Object.values(data.plcData).find(
+          (val: unknown) => typeof val == 'string' && val.includes('BAD'),
+        );
+        if (isBadReading) {
+          await new Promise<void>((res) => {
+            setTimeout(() => {
+              this.dataUpdate();
+              res();
+            }, 500);
+          });
+        }
+        break;
+    }
+    return;
+  };
+
+  private blockInfoIsValid = (
+    blockInfo: BlockInfo[],
+  ): { _isValid: boolean; _blockName: string[] } => {
+    let _isValid = true;
+    const _blockName = [];
+    _.forEach(blockInfo, (info) => {
+      if (info.type === 'READ_ONLY') {
+        console.log(`[ ERROR ]: Read Only Block Found ${JSON.stringify(info)}`);
+        _isValid = false;
+        return;
+      }
+      const addressFound = _.find(this.addressList.write, (block) => {
+        return block.address == info.address;
+      });
+      if (!addressFound) {
+        console.log(`[ ERROR ]: Can not find address ${JSON.stringify(info)}`);
+        _isValid = false;
+        return;
+      }
+      _blockName.push(addressFound.name);
+    });
+    return { _isValid, _blockName };
   };
 }
