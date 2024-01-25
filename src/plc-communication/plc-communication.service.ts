@@ -10,13 +10,13 @@ export class PlcCommunicationService {
   constructor() {
     const dataBlock = {
       barcodeFlag: 'DB1,INT0.1',
-      barcodeData: 'DB8,S2.40',
+      barcodeData: 'DB1,S2.40',
     };
     this.initConnection(dataBlock);
     this.startScan();
   }
   public plcEvent = new events.EventEmitter();
-  public configBlock = {};
+  public configBlock = {}1
 
   private conn = new nodes7();
   private queue = {
