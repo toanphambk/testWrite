@@ -205,7 +205,7 @@ export class PlcCommunicationService {
           return;
         }
         if (log)
-          console.log(`[ WRITE TO PLC DONE] : [ ${blockAdress} ] =[ ${data} ]`);
+          console.log(`[ WRITE TO PLC DONE] : [ ${blockName} ] =[ ${data} ]`);
         res(true);
         return;
       });
