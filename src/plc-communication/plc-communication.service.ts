@@ -20,7 +20,6 @@ export class PlcCommunicationService {
   private async test() {
     const dataBlock = {
       barcodeFlag: 'DB1,INT0.1',
-      barcodeData: 'DB1,S2.40',
     };
     await this.initConnection(dataBlock);
     this.startScan();
