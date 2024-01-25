@@ -30,7 +30,7 @@ export class PlcCommunicationService {
     return new Promise<void>((resolve, reject) => {
       this.conn.initiateConnection(
         {
-          ip: '192.168.0.1',
+          host: '192.168.0.1',
           port: 102,
           rack: 0,
           slot: 1,
