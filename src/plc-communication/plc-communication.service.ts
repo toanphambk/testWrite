@@ -52,9 +52,15 @@ export class PlcCommunicationService {
   private async test() {
     await this.initConnection(configuration.plcSetting);
     await this.addDataBlock(configuration.blockSetting);
+
+    await this.triggerCycleScan();
     this.writeBlock(['barcodeData'], ['123123123']);
     this.writeBlock(['barcodeFlag'], [1]);
-    await this.triggerCycleScan();
+
+    setTimeout(() => {
+      this.writeBlock(['barcodeData'], ['abc']);
+      this.writeBlock(['barcodeFlag'], [1]);
+    }, 2000);
   }
 
   public async initConnection(
@@ -169,8 +175,6 @@ export class PlcCommunicationService {
   private dataUpdate = async () => {
     try {
       const dataFromPLC = await this.readFromPlc();
-      console.log(this.data);
-
       Object.keys(dataFromPLC).map((address) => {
         const found = this.addressList.read.find(
           (block) => block.address === address,
