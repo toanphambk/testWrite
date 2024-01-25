@@ -55,6 +55,7 @@ export class PlcCommunicationService {
     this.writeBlock([configuration.blockSetting.barcodeData], ['asdfasdf']);
     this.writeBlock([configuration.blockSetting.barcodeFlag], [1]);
   }
+
   public async initConnection(
     setting: S7CommunicationSetting,
   ): Promise<boolean> {
@@ -105,7 +106,6 @@ export class PlcCommunicationService {
         this.addressList.write.push({ name: key, address: setting.address });
       }
     });
-    console.log(this.addressList);
 
     const readingAdressList = _.map(this.addressList.read, (block) => {
       return block.address;
