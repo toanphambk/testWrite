@@ -33,10 +33,8 @@ export class PlcCommunicationService {
     await this.initConnection(configuration.plcSetting);
     this.addDataBlock(configuration.blockSetting);
     this.triggerCycleScan();
-    await this.writeBlock(
-      [configuration.blockSetting.barcodeData],
-      ['asdfasdf'],
-    );
+    this.writeBlock([configuration.blockSetting.barcodeData], ['asdfasdf']);
+    this.writeBlock([configuration.blockSetting.barcodeFlag], [1]);
   }
   public async initConnection(
     setting: S7CommunicationSetting,
