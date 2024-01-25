@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import events from 'events';
+import EventEmitter from 'events';
 import nodes7 from 'nodes7';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -15,7 +15,7 @@ export class PlcCommunicationService {
     this.initConnection(dataBlock);
     this.startScan();
   }
-  public plcEvent = new events.EventEmitter();
+  public plcEvent = new EventEmitter();
   public configBlock = {};
 
   private conn = new nodes7();
