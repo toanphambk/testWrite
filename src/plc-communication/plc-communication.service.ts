@@ -15,7 +15,7 @@ export class PlcCommunicationService {
     this.initConnection(dataBlock);
     this.startScan();
   }
-  public plcEvent = new EventEmitter();
+  private plcEvent = new EventEmitter();
   public configBlock = {};
 
   private conn = new nodes7();
