@@ -4,10 +4,7 @@ export interface SystemData {
   plc: PlcData;
 }
 
-export type Service = keyof SystemData;
-
 export interface Payload {
-  service: Service;
   data: any;
   key: keyof (keyof PlcData);
   oldVal: any;

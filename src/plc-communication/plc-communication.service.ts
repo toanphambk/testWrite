@@ -193,7 +193,7 @@ export class PlcCommunicationService {
 
   public writeBlock = (blockName: BlockName[], data: any[], log = true) => {
     return new Promise<boolean>((res, rej) => {
-      const { isValid, blockAddress } = this.blockInfoIsValid(blockName);
+      const { isValid, blockAddress } = this.blockAdressParse(blockName);
       if (!isValid) {
         rej('DATA BLOCK IS NOT VALID');
         return;
@@ -236,7 +236,6 @@ export class PlcCommunicationService {
         if (oldVal != val) {
           target[key] = val;
           const data: Payload = {
-            service: 'plc',
             data: this.data,
             key,
             oldVal,
@@ -288,7 +287,7 @@ export class PlcCommunicationService {
     return;
   };
 
-  private blockInfoIsValid = (
+  private blockAdressParse = (
     blocksName: BlockName[],
   ): { isValid: boolean; blockAddress: string[] } => {
     let isValid = true;
@@ -306,7 +305,6 @@ export class PlcCommunicationService {
       }
       blockAddress.push(foundBlock.address);
     });
-    console.log({ isValid, blockAddress });
     return { isValid, blockAddress };
   };
 }
